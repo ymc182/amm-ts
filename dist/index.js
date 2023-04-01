@@ -7,7 +7,8 @@ const JumpSwap_1 = __importDefault(require("./JumpSwap"));
 const Token_1 = __importDefault(require("./Token"));
 const tokenA = new Token_1.default("Token A", "0x0000000", 18);
 const tokenB = new Token_1.default("Token B", "0x0000001", 18);
-const jumpSwap = new JumpSwap_1.default();
+const rewardToken = new Token_1.default("Reward Token", "0x0000002", 18);
+const jumpSwap = new JumpSwap_1.default(rewardToken);
 jumpSwap.createPool(1, tokenA, tokenB, 10000, 5000, 0.3);
 const tokenIn = tokenB;
 const amountIn = 100;
@@ -16,3 +17,4 @@ for (let i = 0; i < 10; i++) {
     console.log(i, amountOut);
     console.log(jumpSwap.getPoolDetails(1));
 }
+const { reward, refundA, refundB } = jumpSwap.addLiquidity(1, 2000, 500);

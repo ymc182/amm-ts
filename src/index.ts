@@ -3,8 +3,8 @@ import Token from "./Token";
 
 const tokenA = new Token("Token A", "0x0000000", 18);
 const tokenB = new Token("Token B", "0x0000001", 18);
-
-const jumpSwap = new JumpSwap();
+const rewardToken = new Token("Reward Token", "0x0000002", 18);
+const jumpSwap = new JumpSwap(rewardToken);
 
 jumpSwap.createPool(1, tokenA, tokenB, 10000, 5000, 0.3);
 const tokenIn = tokenB;
@@ -14,3 +14,5 @@ for (let i = 0; i < 10; i++) {
 	console.log(i, amountOut);
 	console.log(jumpSwap.getPoolDetails(1));
 }
+
+const { reward, refundA, refundB } = jumpSwap.addLiquidity(1, 2000, 500);
