@@ -1,29 +1,24 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+const LiqulidityManager_1 = require("./LiqulidityManager");
+const PoolManager_1 = require("./PoolManager");
+const SwapCalculator_1 = require("./SwapCalculator");
 class JumpSwap {
     constructor(_rewardToken) {
-        this.pools = new Map();
-        this.rewardToken = _rewardToken;
+        this.poolManager = new PoolManager_1.PoolManager();
+        this.swapCalculator = new SwapCalculator_1.SwapCalculator();
+        this.liquidityAdder = new LiqulidityManager_1.LiquidityAdder(_rewardToken);
     }
     createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, v3Options) {
-        const pool = {
-            poolId,
-            tokenA,
-            tokenB,
-            reserveA,
-            reserveB,
-            fee,
-            v3Options,
-        };
-        this.pools.set(poolId, pool);
+        this.poolManager.createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, v3Options);
     }
     swap(poolId, amountIn, tokenIn) {
-        const pool = this.pools.get(poolId);
+        const pool = this.poolManager.getPool(poolId);
         if (!pool) {
             throw new Error("Pool not found");
         }
         const { tokenA, tokenB } = pool;
-        const swapAmount = this.getPoolAmountOut(poolId, amountIn, tokenIn);
+        const swapAmount = this.swapCalculator.calculateSwap(pool, amountIn, tokenIn, 1);
         if (tokenIn.address === tokenA.address) {
             pool.reserveA += amountIn;
             pool.reserveB -= swapAmount;
@@ -35,12 +30,12 @@ class JumpSwap {
         return swapAmount;
     }
     swapV2(poolId, amountIn, tokenIn) {
-        const pool = this.pools.get(poolId);
+        const pool = this.poolManager.getPool(poolId);
         if (!pool) {
             throw new Error("Pool not found");
         }
         const { tokenA, tokenB } = pool;
-        const swapAmount = this.getPoolAmountOutV2(poolId, amountIn, tokenIn);
+        const swapAmount = this.swapCalculator.calculateSwap(pool, amountIn, tokenIn, 2);
         if (tokenIn.address === tokenA.address) {
             pool.reserveA += amountIn;
             pool.reserveB -= swapAmount;
@@ -51,7 +46,7 @@ class JumpSwap {
         }
         return swapAmount;
     }
-    swapV3(poolId, amountIn, tokenIn) {
+    /* swapV3(poolId: number, amountIn: number, tokenIn: Token): number {
         const pool = this.pools.get(poolId);
         if (!pool) {
             throw new Error("Pool not found");
@@ -59,10 +54,13 @@ class JumpSwap {
         if (!pool.v3Options) {
             throw new Error("This pool is not using Uniswap v3 options");
         }
+
         const liquidityRanges = pool.v3Options.liquidityRanges;
+
         if (liquidityRanges.length === 0) {
             throw new Error("No liquidity ranges found");
         }
+
         let remainingAmountIn = amountIn;
         let totalOut = 0;
         for (const range of liquidityRanges) {
@@ -70,8 +68,7 @@ class JumpSwap {
             if (tokenIn.address === pool.tokenA.address) {
                 reserveIn = range.reserveA;
                 reserveOut = range.reserveB;
-            }
-            else {
+            } else {
                 reserveIn = range.reserveB;
                 reserveOut = range.reserveA;
             }
@@ -81,149 +78,24 @@ class JumpSwap {
             if (tokenIn.address === pool.tokenA.address) {
                 range.reserveA += remainingAmountIn;
                 range.reserveB -= portionOut;
-            }
-            else {
+            } else {
                 range.reserveB += remainingAmountIn;
                 range.reserveA -= portionOut;
             }
         }
+
         return totalOut;
-    }
-    getPoolAmountOut(poolId, amountIn, tokenIn) {
-        const pool = this.pools.get(poolId);
-        if (!pool) {
-            throw new Error("Pool not found");
-        }
-        const { tokenA, tokenB } = pool;
-        let remainingAmountIn = amountIn;
-        let totalOut = 0;
-        let reserveA = pool.reserveA;
-        let reserveB = pool.reserveB;
-        let portionAmountIn = 0;
-        while (remainingAmountIn > 0) {
-            portionAmountIn =
-                remainingAmountIn > amountIn * 0.05
-                    ? amountIn * 0.05
-                    : remainingAmountIn;
-            let portionOut = 0;
-            if (tokenIn.address === tokenA.address) {
-                portionOut = this.getAmountOut(portionAmountIn, reserveA, reserveB);
-                reserveA += portionAmountIn;
-                reserveB -= portionOut;
-            }
-            if (tokenIn.address === tokenB.address) {
-                portionOut += this.getAmountOut(portionAmountIn, reserveB, reserveA);
-                reserveB += portionAmountIn;
-                reserveA -= portionOut;
-            }
-            remainingAmountIn -= portionAmountIn;
-            totalOut += portionOut;
-        }
-        return totalOut;
-    }
-    getPoolAmountOutV2(poolId, amountIn, tokenIn) {
-        //X = (Y * V) / (U + Y)
-        const pool = this.pools.get(poolId);
-        if (!pool) {
-            throw new Error("Pool not found");
-        }
-        const { tokenA, tokenB } = pool;
-        let remainingAmountIn = amountIn;
-        let totalOut = 0;
-        let reserveA = pool.reserveA;
-        let reserveB = pool.reserveB;
-        let portionAmountIn = 0;
-        while (remainingAmountIn > 0) {
-            portionAmountIn =
-                remainingAmountIn > amountIn * 0.05
-                    ? amountIn * 0.05
-                    : remainingAmountIn;
-            let portionOut = 0;
-            if (tokenIn.address === tokenA.address) {
-                portionOut = this.getAmountOutV2(portionAmountIn, reserveA, reserveB);
-                reserveA += portionAmountIn;
-                reserveB -= portionOut;
-            }
-            if (tokenIn.address === tokenB.address) {
-                portionOut += this.getAmountOutV2(portionAmountIn, reserveB, reserveA);
-                reserveB += portionAmountIn;
-                reserveA -= portionOut;
-            }
-            remainingAmountIn -= portionAmountIn;
-            totalOut += portionOut;
-        }
-        return totalOut;
-    }
-    getAmountOutV3(poolId, amountIn, tokenIn, tickLower, tickUpper) {
-        const pool = this.pools.get(poolId);
-        if (!pool) {
-            throw new Error("Pool not found");
-        }
-        if (!pool.v3Options) {
-            throw new Error("This pool is not using Uniswap v3 options");
-        }
-        const liquidityRanges = pool.v3Options.liquidityRanges.filter((range) => range.tickLower <= tickUpper && range.tickUpper >= tickLower);
-        if (liquidityRanges.length === 0) {
-            throw new Error("No liquidity ranges found for the specified ticks");
-        }
-        let remainingAmountIn = amountIn;
-        let totalOut = 0;
-        for (const range of liquidityRanges) {
-            let reserveIn, reserveOut;
-            if (tokenIn.address === pool.tokenA.address) {
-                reserveIn = range.reserveA;
-                reserveOut = range.reserveB;
-            }
-            else {
-                reserveIn = range.reserveB;
-                reserveOut = range.reserveA;
-            }
-            const portionOut = this.getAmountOut(remainingAmountIn, reserveIn, reserveOut);
-            totalOut += portionOut;
-            remainingAmountIn -= portionOut;
-        }
-        return totalOut;
-    }
-    getAmountOutV2(amountIn, reserveIn, reserveOut) {
-        const amountInWithFee = amountIn * (1 - 0.003);
-        const numerator = reserveOut * amountIn;
-        const denominator = reserveIn + amountIn;
-        return numerator / denominator;
-    }
-    getAmountOut(amountIn, reserveIn, reserveOut) {
-        const amountInWithFee = amountIn * 9970;
-        const numerator = amountInWithFee * reserveOut;
-        const denominator = reserveIn * 10000 + amountInWithFee;
-        return numerator / denominator;
-    }
+    } */
     getPoolDetails(poolId) {
-        var _a, _b;
-        return {
-            poolId,
-            reserveA: (_a = this.pools.get(poolId)) === null || _a === void 0 ? void 0 : _a.reserveA,
-            reserveB: (_b = this.pools.get(poolId)) === null || _b === void 0 ? void 0 : _b.reserveB,
-        };
+        return this.poolManager.getPoolDetails(poolId);
     }
     addLiquidity(poolId, amountA, amountB) {
-        const rewardRate = 10000; // 10000 token per liquidity
-        const pool = this.pools.get(poolId);
+        const pool = this.poolManager.getPool(poolId);
         if (!pool) {
             throw new Error("Pool not found");
         }
-        const k = pool.reserveA * pool.reserveB;
-        //add amount without affecting the price ,based on the max amount A or B
-        const liquidity = Math.min(amountA * pool.reserveB, amountB * pool.reserveA) / k;
-        const amountAIn = liquidity * pool.reserveA;
-        const amountBIn = liquidity * pool.reserveB;
-        pool.reserveA += amountAIn;
-        pool.reserveB += amountBIn;
-        //calculate the amount of LP tokens to mint
-        const lpTokens = liquidity * rewardRate;
-        return {
-            reward: lpTokens,
-            refundA: amountA - amountAIn,
-            refundB: amountB - amountBIn,
-        };
+        const liquidity = this.liquidityAdder.addLiquidity(pool, amountA, amountB);
+        return liquidity;
     }
 }
 exports.default = JumpSwap;

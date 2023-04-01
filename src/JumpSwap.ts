@@ -1,47 +1,17 @@
+import { ILiquidityAdder, LiquidityAdder } from "./LiqulidityManager";
+import { IPoolManager, PoolManager } from "./PoolManager";
+import { ISwapCalculator, SwapCalculator } from "./SwapCalculator";
 import Token from "./Token";
+import type { Pool, V3Options } from "./types";
 
-type Pool = {
-	poolId: number;
-	tokenA: Token;
-	tokenB: Token;
-	reserveA: number;
-	reserveB: number;
-	fee: number;
-	v3Options?: V3Options;
-};
-
-type V3Options = {
-	feeTier?: number;
-	liquidityRanges: Array<{
-		tickLower: number;
-		tickUpper: number;
-		reserveA: number;
-		reserveB: number;
-	}>;
-};
-
-interface IJumpRewardable {
-	rewardToken: Token;
-}
-
-interface IJumpAddableLiquidity extends IJumpRewardable {
-	addLiquidity(
-		poolId: number,
-		amountA: number,
-		amountB: number
-	): {
-		reward: number;
-		refundA: number;
-		refundB: number;
-	};
-}
-
-export default class JumpSwap implements IJumpAddableLiquidity {
-	pools: Map<number, Pool>;
-	rewardToken: Token;
+export default class JumpSwap {
+	private poolManager: IPoolManager;
+	private swapCalculator: ISwapCalculator;
+	private liquidityAdder: ILiquidityAdder;
 	constructor(_rewardToken: Token) {
-		this.pools = new Map();
-		this.rewardToken = _rewardToken;
+		this.poolManager = new PoolManager();
+		this.swapCalculator = new SwapCalculator();
+		this.liquidityAdder = new LiquidityAdder(_rewardToken);
 	}
 
 	createPool(
@@ -53,25 +23,29 @@ export default class JumpSwap implements IJumpAddableLiquidity {
 		fee: number,
 		v3Options?: V3Options
 	) {
-		const pool = {
+		this.poolManager.createPool(
 			poolId,
 			tokenA,
 			tokenB,
 			reserveA,
 			reserveB,
 			fee,
-			v3Options,
-		};
-		this.pools.set(poolId, pool);
+			v3Options
+		);
 	}
 
 	swap(poolId: number, amountIn: number, tokenIn: Token): number {
-		const pool = this.pools.get(poolId);
+		const pool = this.poolManager.getPool(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
 		}
 		const { tokenA, tokenB } = pool;
-		const swapAmount = this.getPoolAmountOut(poolId, amountIn, tokenIn);
+		const swapAmount = this.swapCalculator.calculateSwap(
+			pool,
+			amountIn,
+			tokenIn,
+			1
+		);
 		if (tokenIn.address === tokenA.address) {
 			pool.reserveA += amountIn;
 			pool.reserveB -= swapAmount;
@@ -84,12 +58,17 @@ export default class JumpSwap implements IJumpAddableLiquidity {
 		return swapAmount;
 	}
 	swapV2(poolId: number, amountIn: number, tokenIn: Token): number {
-		const pool = this.pools.get(poolId);
+		const pool = this.poolManager.getPool(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
 		}
 		const { tokenA, tokenB } = pool;
-		const swapAmount = this.getPoolAmountOutV2(poolId, amountIn, tokenIn);
+		const swapAmount = this.swapCalculator.calculateSwap(
+			pool,
+			amountIn,
+			tokenIn,
+			2
+		);
 		if (tokenIn.address === tokenA.address) {
 			pool.reserveA += amountIn;
 			pool.reserveB -= swapAmount;
@@ -101,7 +80,7 @@ export default class JumpSwap implements IJumpAddableLiquidity {
 
 		return swapAmount;
 	}
-	swapV3(poolId: number, amountIn: number, tokenIn: Token): number {
+	/* swapV3(poolId: number, amountIn: number, tokenIn: Token): number {
 		const pool = this.pools.get(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
@@ -140,163 +119,18 @@ export default class JumpSwap implements IJumpAddableLiquidity {
 		}
 
 		return totalOut;
-	}
-	getPoolAmountOut(poolId: number, amountIn: number, tokenIn: Token) {
-		const pool = this.pools.get(poolId);
-		if (!pool) {
-			throw new Error("Pool not found");
-		}
-		const { tokenA, tokenB } = pool;
-		let remainingAmountIn = amountIn;
-		let totalOut = 0;
-		let reserveA = pool.reserveA;
-		let reserveB = pool.reserveB;
-		let portionAmountIn = 0;
-		while (remainingAmountIn > 0) {
-			portionAmountIn =
-				remainingAmountIn > amountIn * 0.05
-					? amountIn * 0.05
-					: remainingAmountIn;
-			let portionOut = 0;
-			if (tokenIn.address === tokenA.address) {
-				portionOut = this.getAmountOut(portionAmountIn, reserveA, reserveB);
-				reserveA += portionAmountIn;
-				reserveB -= portionOut;
-			}
-			if (tokenIn.address === tokenB.address) {
-				portionOut += this.getAmountOut(portionAmountIn, reserveB, reserveA);
-				reserveB += portionAmountIn;
-				reserveA -= portionOut;
-			}
-			remainingAmountIn -= portionAmountIn;
-			totalOut += portionOut;
-		}
-
-		return totalOut;
-	}
-	getPoolAmountOutV2(poolId: number, amountIn: number, tokenIn: Token) {
-		//X = (Y * V) / (U + Y)
-		const pool = this.pools.get(poolId);
-		if (!pool) {
-			throw new Error("Pool not found");
-		}
-		const { tokenA, tokenB } = pool;
-		let remainingAmountIn = amountIn;
-		let totalOut = 0;
-		let reserveA = pool.reserveA;
-		let reserveB = pool.reserveB;
-		let portionAmountIn = 0;
-		while (remainingAmountIn > 0) {
-			portionAmountIn =
-				remainingAmountIn > amountIn * 0.05
-					? amountIn * 0.05
-					: remainingAmountIn;
-			let portionOut = 0;
-			if (tokenIn.address === tokenA.address) {
-				portionOut = this.getAmountOutV2(portionAmountIn, reserveA, reserveB);
-				reserveA += portionAmountIn;
-				reserveB -= portionOut;
-			}
-			if (tokenIn.address === tokenB.address) {
-				portionOut += this.getAmountOutV2(portionAmountIn, reserveB, reserveA);
-				reserveB += portionAmountIn;
-				reserveA -= portionOut;
-			}
-			remainingAmountIn -= portionAmountIn;
-			totalOut += portionOut;
-		}
-
-		return totalOut;
-	}
-	getAmountOutV3(
-		poolId: number,
-		amountIn: number,
-		tokenIn: Token,
-		tickLower: number,
-		tickUpper: number
-	) {
-		const pool = this.pools.get(poolId);
-		if (!pool) {
-			throw new Error("Pool not found");
-		}
-		if (!pool.v3Options) {
-			throw new Error("This pool is not using Uniswap v3 options");
-		}
-
-		const liquidityRanges = pool.v3Options.liquidityRanges.filter(
-			(range) => range.tickLower <= tickUpper && range.tickUpper >= tickLower
-		);
-
-		if (liquidityRanges.length === 0) {
-			throw new Error("No liquidity ranges found for the specified ticks");
-		}
-
-		let remainingAmountIn = amountIn;
-		let totalOut = 0;
-		for (const range of liquidityRanges) {
-			let reserveIn, reserveOut;
-			if (tokenIn.address === pool.tokenA.address) {
-				reserveIn = range.reserveA;
-				reserveOut = range.reserveB;
-			} else {
-				reserveIn = range.reserveB;
-				reserveOut = range.reserveA;
-			}
-			const portionOut = this.getAmountOut(
-				remainingAmountIn,
-				reserveIn,
-				reserveOut
-			);
-			totalOut += portionOut;
-			remainingAmountIn -= portionOut;
-		}
-
-		return totalOut;
-	}
-	getAmountOutV2(amountIn: number, reserveIn: number, reserveOut: number) {
-		const amountInWithFee = amountIn * (1 - 0.003);
-		const numerator = reserveOut * amountIn;
-		const denominator = reserveIn + amountIn;
-		return numerator / denominator;
-	}
-	getAmountOut(amountIn: number, reserveIn: number, reserveOut: number) {
-		const amountInWithFee = amountIn * 9970;
-		const numerator = amountInWithFee * reserveOut;
-		const denominator = reserveIn * 10000 + amountInWithFee;
-		return numerator / denominator;
-	}
+	} */
 
 	getPoolDetails(poolId: number) {
-		return {
-			poolId,
-			reserveA: this.pools.get(poolId)?.reserveA,
-			reserveB: this.pools.get(poolId)?.reserveB,
-		};
+		return this.poolManager.getPoolDetails(poolId);
 	}
 
 	addLiquidity(poolId: number, amountA: number, amountB: number) {
-		const rewardRate = 10000; // 10000 token per liquidity
-		const pool = this.pools.get(poolId);
+		const pool = this.poolManager.getPool(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
 		}
-		const k = pool.reserveA * pool.reserveB;
-		//add amount without affecting the price ,based on the max amount A or B
-		const liquidity =
-			Math.min(amountA * pool.reserveB, amountB * pool.reserveA) / k;
-
-		const amountAIn = liquidity * pool.reserveA;
-		const amountBIn = liquidity * pool.reserveB;
-
-		pool.reserveA += amountAIn;
-		pool.reserveB += amountBIn;
-
-		//calculate the amount of LP tokens to mint
-		const lpTokens = liquidity * rewardRate;
-		return {
-			reward: lpTokens,
-			refundA: amountA - amountAIn,
-			refundB: amountB - amountBIn,
-		};
+		const liquidity = this.liquidityAdder.addLiquidity(pool, amountA, amountB);
+		return liquidity;
 	}
 }

@@ -47,8 +47,3 @@ jumpSwap.createPool(3, tokenA, tokenB, 10000, 5000, 0.3, {
         },
     ],
 });
-for (let i = 0; i < 10; i++) {
-    const amountOut = jumpSwap.swapV3(3, amountIn, tokenIn);
-    console.log(`${i + 1} Trade : `, amountOut);
-}
-const { reward, refundA, refundB } = jumpSwap.addLiquidity(1, 2000, 500);

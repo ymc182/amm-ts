@@ -1,4 +1,10 @@
-export default class Token {
+export interface IToken {
+	name: string;
+	address: string;
+	decimals: number;
+}
+
+export default class Token implements IToken {
 	name: string;
 	address: string;
 	decimals: number;
