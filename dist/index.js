@@ -10,7 +10,7 @@ const tokenB = new Token_1.default("Token B", "0x0000001", 18);
 const jumpSwap = new JumpSwap_1.default();
 jumpSwap.createPool(1, tokenA, tokenB, 10000, 5000, 0.3);
 const tokenIn = tokenB;
-const amountIn = 80090;
+const amountIn = 100;
 for (let i = 0; i < 10; i++) {
     const amountOut = jumpSwap.swap(1, amountIn, tokenIn);
     console.log(i, amountOut);
