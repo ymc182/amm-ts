@@ -1,4 +1,4 @@
-import Token from "./Token";
+import Token from "./Token/Token";
 
 export type Pool = {
 	poolId: number;

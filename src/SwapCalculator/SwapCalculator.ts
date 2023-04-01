@@ -1,5 +1,5 @@
-import Token from "./Token";
-import type { Pool } from "./types";
+import Token from "../Token/Token";
+import type { Pool } from "../types";
 
 export interface ISwapCalculator {
 	calculateSwap(

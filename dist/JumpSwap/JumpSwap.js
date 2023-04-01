@@ -1,8 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-const LiqulidityManager_1 = require("./LqManager/LiqulidityManager");
-const PoolManager_1 = require("./PoolManager");
-const SwapCalculator_1 = require("./SwapCalculator");
+const LiqulidityManager_1 = require("../LqManager/LiqulidityManager");
+const PoolManager_1 = require("../PoolManager/PoolManager");
+const SwapCalculator_1 = require("../SwapCalculator/SwapCalculator");
 class JumpSwap {
     constructor(_rewardToken) {
         this.poolManager = new PoolManager_1.PoolManager();
@@ -12,30 +12,13 @@ class JumpSwap {
     createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, v3Options) {
         this.poolManager.createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, v3Options);
     }
-    swap(poolId, amountIn, tokenIn) {
+    swap(poolId, amountIn, tokenIn, version) {
         const pool = this.poolManager.getPool(poolId);
         if (!pool) {
             throw new Error("Pool not found");
         }
         const { tokenA, tokenB } = pool;
-        const swapAmount = this.swapCalculator.calculateSwap(pool, amountIn, tokenIn, 1);
-        if (tokenIn.address === tokenA.address) {
-            pool.reserveA += amountIn;
-            pool.reserveB -= swapAmount;
-        }
-        if (tokenIn.address === tokenB.address) {
-            pool.reserveB += amountIn;
-            pool.reserveA -= swapAmount;
-        }
-        return swapAmount;
-    }
-    swapV2(poolId, amountIn, tokenIn) {
-        const pool = this.poolManager.getPool(poolId);
-        if (!pool) {
-            throw new Error("Pool not found");
-        }
-        const { tokenA, tokenB } = pool;
-        const swapAmount = this.swapCalculator.calculateSwap(pool, amountIn, tokenIn, 2);
+        const swapAmount = this.swapCalculator.calculateSwap(pool, amountIn, tokenIn, version);
         if (tokenIn.address === tokenA.address) {
             pool.reserveA += amountIn;
             pool.reserveB -= swapAmount;

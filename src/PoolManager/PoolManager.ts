@@ -1,35 +1,7 @@
-import Token from "./Token";
-type V3Options = {
-	feeTier?: number;
-	liquidityRanges: Array<{
-		tickLower: number;
-		tickUpper: number;
-		reserveA: number;
-		reserveB: number;
-	}>;
-};
-type Pool = {
-	poolId: number;
-	tokenA: Token;
-	tokenB: Token;
-	reserveA: number;
-	reserveB: number;
-	fee: number;
-	v3Options?: V3Options;
-};
-export interface IPoolManager {
-	createPool(
-		poolId: number,
-		tokenA: Token,
-		tokenB: Token,
-		reserveA: number,
-		reserveB: number,
-		fee: number,
-		v3Options?: V3Options
-	): void;
-	getPoolDetails(poolId: number): Pool | undefined;
-	getPool(poolId: number): Pool;
-}
+import Token from "../Token/Token";
+import { Pool, V3Options } from "../types";
+import { IPoolManager } from "./IPoolManager";
+
 export class PoolManager implements IPoolManager {
 	private pools: Map<number, Pool>;
 

@@ -1,5 +1,5 @@
-import type { IToken } from "./Token";
-import { Pool } from "./types";
+import { IToken } from "../Token/IToken";
+import { Pool } from "../types";
 
 interface IJumpRewardable {
 	rewardToken: IToken;

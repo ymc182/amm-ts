@@ -1,13 +1,13 @@
-import { ILiquidityAdder, LiquidityAdder } from "./LiqulidityManager";
-import { IPoolManager, PoolManager } from "./PoolManager";
-import { ISwapCalculator, SwapCalculator } from "./SwapCalculator";
-import Token from "./Token";
-import type { Pool, V3Options } from "./types";
+import { LiquidityAdder } from "../LqManager/LiqulidityManager";
+import { PoolManager } from "../PoolManager/PoolManager";
+import { SwapCalculator } from "../SwapCalculator/SwapCalculator";
+import Token from "../Token/Token";
+import type { V3Options } from "../types";
 
 export default class JumpSwap {
-	private poolManager: IPoolManager;
-	private swapCalculator: ISwapCalculator;
-	private liquidityAdder: ILiquidityAdder;
+	private poolManager: PoolManager;
+	private swapCalculator: SwapCalculator;
+	private liquidityAdder: LiquidityAdder;
 	constructor(_rewardToken: Token) {
 		this.poolManager = new PoolManager();
 		this.swapCalculator = new SwapCalculator();
@@ -34,7 +34,12 @@ export default class JumpSwap {
 		);
 	}
 
-	swap(poolId: number, amountIn: number, tokenIn: Token): number {
+	swap(
+		poolId: number,
+		amountIn: number,
+		tokenIn: Token,
+		version: 1 | 2
+	): number {
 		const pool = this.poolManager.getPool(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
@@ -44,7 +49,7 @@ export default class JumpSwap {
 			pool,
 			amountIn,
 			tokenIn,
-			1
+			version
 		);
 		if (tokenIn.address === tokenA.address) {
 			pool.reserveA += amountIn;
@@ -57,29 +62,7 @@ export default class JumpSwap {
 
 		return swapAmount;
 	}
-	swapV2(poolId: number, amountIn: number, tokenIn: Token): number {
-		const pool = this.poolManager.getPool(poolId);
-		if (!pool) {
-			throw new Error("Pool not found");
-		}
-		const { tokenA, tokenB } = pool;
-		const swapAmount = this.swapCalculator.calculateSwap(
-			pool,
-			amountIn,
-			tokenIn,
-			2
-		);
-		if (tokenIn.address === tokenA.address) {
-			pool.reserveA += amountIn;
-			pool.reserveB -= swapAmount;
-		}
-		if (tokenIn.address === tokenB.address) {
-			pool.reserveB += amountIn;
-			pool.reserveA -= swapAmount;
-		}
 
-		return swapAmount;
-	}
 	/* swapV3(poolId: number, amountIn: number, tokenIn: Token): number {
 		const pool = this.pools.get(poolId);
 		if (!pool) {

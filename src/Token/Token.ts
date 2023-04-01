@@ -1,8 +1,4 @@
-export interface IToken {
-	name: string;
-	address: string;
-	decimals: number;
-}
+import { IToken } from "./IToken";
 
 export default class Token implements IToken {
 	name: string;
