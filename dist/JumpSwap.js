@@ -34,38 +34,6 @@ class JumpSwap {
         }
         return swapAmount;
     }
-    getPoolAmountOut(poolId, amountIn, tokenIn) {
-        const pool = this.pools.get(poolId);
-        if (!pool) {
-            throw new Error("Pool not found");
-        }
-        const { tokenA, tokenB } = pool;
-        let remainingAmountIn = amountIn;
-        let totalOut = 0;
-        let reserveA = pool.reserveA;
-        let reserveB = pool.reserveB;
-        let portionAmountIn = 0;
-        while (remainingAmountIn > 0) {
-            portionAmountIn =
-                remainingAmountIn > amountIn * 0.05
-                    ? amountIn * 0.05
-                    : remainingAmountIn;
-            let portionOut = 0;
-            if (tokenIn.address === tokenA.address) {
-                portionOut = this.getAmountOut(portionAmountIn, reserveA, reserveB);
-                reserveA += portionAmountIn;
-                reserveB -= portionOut;
-            }
-            if (tokenIn.address === tokenB.address) {
-                portionOut += this.getAmountOut(portionAmountIn, reserveB, reserveA);
-                reserveB += portionAmountIn;
-                reserveA -= portionOut;
-            }
-            remainingAmountIn -= portionAmountIn;
-            totalOut += portionOut;
-        }
-        return totalOut;
-    }
     swapV2(poolId, amountIn, tokenIn) {
         const pool = this.pools.get(poolId);
         if (!pool) {
@@ -118,6 +86,38 @@ class JumpSwap {
                 range.reserveB += remainingAmountIn;
                 range.reserveA -= portionOut;
             }
+        }
+        return totalOut;
+    }
+    getPoolAmountOut(poolId, amountIn, tokenIn) {
+        const pool = this.pools.get(poolId);
+        if (!pool) {
+            throw new Error("Pool not found");
+        }
+        const { tokenA, tokenB } = pool;
+        let remainingAmountIn = amountIn;
+        let totalOut = 0;
+        let reserveA = pool.reserveA;
+        let reserveB = pool.reserveB;
+        let portionAmountIn = 0;
+        while (remainingAmountIn > 0) {
+            portionAmountIn =
+                remainingAmountIn > amountIn * 0.05
+                    ? amountIn * 0.05
+                    : remainingAmountIn;
+            let portionOut = 0;
+            if (tokenIn.address === tokenA.address) {
+                portionOut = this.getAmountOut(portionAmountIn, reserveA, reserveB);
+                reserveA += portionAmountIn;
+                reserveB -= portionOut;
+            }
+            if (tokenIn.address === tokenB.address) {
+                portionOut += this.getAmountOut(portionAmountIn, reserveB, reserveA);
+                reserveB += portionAmountIn;
+                reserveA -= portionOut;
+            }
+            remainingAmountIn -= portionAmountIn;
+            totalOut += portionOut;
         }
         return totalOut;
     }
