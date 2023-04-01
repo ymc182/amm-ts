@@ -5,7 +5,7 @@ class JumpSwap {
         this.pools = new Map();
         this.rewardToken = _rewardToken;
     }
-    createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, feeTier) {
+    createPool(poolId, tokenA, tokenB, reserveA, reserveB, fee, v3Options) {
         const pool = {
             poolId,
             tokenA,
@@ -13,7 +13,7 @@ class JumpSwap {
             reserveA,
             reserveB,
             fee,
-            feeTier,
+            v3Options,
         };
         this.pools.set(poolId, pool);
     }
@@ -83,6 +83,44 @@ class JumpSwap {
         }
         return swapAmount;
     }
+    swapV3(poolId, amountIn, tokenIn) {
+        const pool = this.pools.get(poolId);
+        if (!pool) {
+            throw new Error("Pool not found");
+        }
+        if (!pool.v3Options) {
+            throw new Error("This pool is not using Uniswap v3 options");
+        }
+        const liquidityRanges = pool.v3Options.liquidityRanges;
+        if (liquidityRanges.length === 0) {
+            throw new Error("No liquidity ranges found");
+        }
+        let remainingAmountIn = amountIn;
+        let totalOut = 0;
+        for (const range of liquidityRanges) {
+            let reserveIn, reserveOut, portionOut;
+            if (tokenIn.address === pool.tokenA.address) {
+                reserveIn = range.reserveA;
+                reserveOut = range.reserveB;
+            }
+            else {
+                reserveIn = range.reserveB;
+                reserveOut = range.reserveA;
+            }
+            portionOut = this.getAmountOut(remainingAmountIn, reserveIn, reserveOut);
+            remainingAmountIn -= portionOut;
+            totalOut += portionOut;
+            if (tokenIn.address === pool.tokenA.address) {
+                range.reserveA += remainingAmountIn;
+                range.reserveB -= portionOut;
+            }
+            else {
+                range.reserveB += remainingAmountIn;
+                range.reserveA -= portionOut;
+            }
+        }
+        return totalOut;
+    }
     getPoolAmountOutV2(poolId, amountIn, tokenIn) {
         //X = (Y * V) / (U + Y)
         const pool = this.pools.get(poolId);
@@ -113,6 +151,36 @@ class JumpSwap {
             }
             remainingAmountIn -= portionAmountIn;
             totalOut += portionOut;
+        }
+        return totalOut;
+    }
+    getAmountOutV3(poolId, amountIn, tokenIn, tickLower, tickUpper) {
+        const pool = this.pools.get(poolId);
+        if (!pool) {
+            throw new Error("Pool not found");
+        }
+        if (!pool.v3Options) {
+            throw new Error("This pool is not using Uniswap v3 options");
+        }
+        const liquidityRanges = pool.v3Options.liquidityRanges.filter((range) => range.tickLower <= tickUpper && range.tickUpper >= tickLower);
+        if (liquidityRanges.length === 0) {
+            throw new Error("No liquidity ranges found for the specified ticks");
+        }
+        let remainingAmountIn = amountIn;
+        let totalOut = 0;
+        for (const range of liquidityRanges) {
+            let reserveIn, reserveOut;
+            if (tokenIn.address === pool.tokenA.address) {
+                reserveIn = range.reserveA;
+                reserveOut = range.reserveB;
+            }
+            else {
+                reserveIn = range.reserveB;
+                reserveOut = range.reserveA;
+            }
+            const portionOut = this.getAmountOut(remainingAmountIn, reserveIn, reserveOut);
+            totalOut += portionOut;
+            remainingAmountIn -= portionOut;
         }
         return totalOut;
     }
