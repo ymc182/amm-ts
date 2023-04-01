@@ -12,7 +12,12 @@ const amountIn = 100;
 for (let i = 0; i < 10; i++) {
 	const amountOut = jumpSwap.swap(1, amountIn, tokenIn);
 	console.log(i, amountOut);
-	console.log(jumpSwap.getPoolDetails(1));
+}
+
+jumpSwap.createPool(2, tokenA, tokenB, 10000, 5000, 0.3);
+for (let i = 0; i < 10; i++) {
+	const amountOut = jumpSwap.swapV2(2, amountIn, tokenIn);
+	console.log(i, amountOut);
 }
 
 const { reward, refundA, refundB } = jumpSwap.addLiquidity(1, 2000, 500);
