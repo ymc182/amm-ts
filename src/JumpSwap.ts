@@ -9,11 +9,30 @@ type Pool = {
 	fee: number;
 };
 
-export default class JumpSwap {
+interface IJumpRewardable {
+	rewardToken: Token;
+}
+
+interface IJumpAddableLiquidity extends IJumpRewardable {
+	addLiquidity(
+		poolId: number,
+		amountA: number,
+		amountB: number
+	): {
+		reward: number;
+		refundA: number;
+		refundB: number;
+	};
+}
+
+export default class JumpSwap implements IJumpAddableLiquidity {
 	pools: Map<number, Pool>;
-	constructor() {
+	rewardToken: Token;
+	constructor(_rewardToken: Token) {
 		this.pools = new Map();
+		this.rewardToken = _rewardToken;
 	}
+
 	createPool(
 		poolId: number,
 		tokenA: Token,
@@ -83,7 +102,6 @@ export default class JumpSwap {
 
 		return totalOut;
 	}
-
 	getAmountOut(amountIn: number, reserveIn: number, reserveOut: number) {
 		const amountInWithFee = amountIn * 9970;
 		const numerator = amountInWithFee * reserveOut;
@@ -96,6 +114,33 @@ export default class JumpSwap {
 			poolId,
 			reserveA: this.pools.get(poolId)?.reserveA,
 			reserveB: this.pools.get(poolId)?.reserveB,
+		};
+	}
+
+	addLiquidity(poolId: number, amountA: number, amountB: number) {
+		const rewardRate = 10000; // 10000 token per liquidity
+		const pool = this.pools.get(poolId);
+		if (!pool) {
+			throw new Error("Pool not found");
+		}
+		const k = pool.reserveA * pool.reserveB;
+		//add amount without affecting the price ,based on the max amount A or B
+		const liquidity =
+			Math.min(amountA * pool.reserveB, amountB * pool.reserveA) / k;
+
+		const amountAIn = liquidity * pool.reserveA;
+		const amountBIn = liquidity * pool.reserveB;
+
+		pool.reserveA += amountAIn;
+		pool.reserveB += amountBIn;
+
+		//calculate the amount of LP tokens to mint
+		const lpTokens = liquidity * rewardRate;
+		console.log("liquidity", liquidity);
+		return {
+			reward: lpTokens,
+			refundA: amountA - amountAIn,
+			refundB: amountB - amountBIn,
 		};
 	}
 }
