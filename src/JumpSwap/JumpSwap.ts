@@ -1,16 +1,19 @@
 import { LiquidityAdder } from "../LqManager/LiqulidityManager";
 import { PoolManager } from "../PoolManager/PoolManager";
-import { SwapCalculator } from "../SwapCalculator/SwapCalculator";
+import {
+	ISwapCalculator,
+	SwapCalculator,
+} from "../SwapCalculator/SwapCalculator";
 import Token from "../Token/Token";
 import type { V3Options } from "../types";
 
 export default class JumpSwap {
 	private poolManager: PoolManager;
-	private swapCalculator: SwapCalculator;
+	private swapCalculator: ISwapCalculator;
 	private liquidityAdder: LiquidityAdder;
-	constructor(_rewardToken: Token) {
+	constructor(_rewardToken: Token, _swapCalculator: ISwapCalculator) {
 		this.poolManager = new PoolManager();
-		this.swapCalculator = new SwapCalculator();
+		this.swapCalculator = _swapCalculator;
 		this.liquidityAdder = new LiquidityAdder(_rewardToken);
 	}
 
@@ -34,12 +37,7 @@ export default class JumpSwap {
 		);
 	}
 
-	swap(
-		poolId: number,
-		amountIn: number,
-		tokenIn: Token,
-		version: 1 | 2
-	): number {
+	swap(poolId: number, amountIn: number, tokenIn: Token): number {
 		const pool = this.poolManager.getPool(poolId);
 		if (!pool) {
 			throw new Error("Pool not found");
@@ -48,8 +46,7 @@ export default class JumpSwap {
 		const swapAmount = this.swapCalculator.calculateSwap(
 			pool,
 			amountIn,
-			tokenIn,
-			version
+			tokenIn
 		);
 		if (tokenIn.address === tokenA.address) {
 			pool.reserveA += amountIn;

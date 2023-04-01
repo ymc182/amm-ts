@@ -2,12 +2,7 @@ import Token from "../Token/Token";
 import type { Pool } from "../types";
 
 export interface ISwapCalculator {
-	calculateSwap(
-		pool: Pool,
-		amountIn: number,
-		tokenIn: Token,
-		version: number
-	): number;
+	calculateSwap(pool: Pool, amountIn: number, tokenIn: Token): number;
 }
 export class SwapCalculator implements ISwapCalculator {
 	private getPoolAmountOut(
@@ -47,6 +42,18 @@ export class SwapCalculator implements ISwapCalculator {
 		return totalOut;
 	}
 
+	calculateSwap(pool: Pool, amountIn: number, tokenIn: Token): number {
+		return this.getPoolAmountOut(pool, amountIn, tokenIn);
+	}
+	getAmountOut(amountIn: number, reserveIn: number, reserveOut: number) {
+		const amountInWithFee = amountIn * 9970;
+		const numerator = amountInWithFee * reserveOut;
+		const denominator = reserveIn * 10000 + amountInWithFee;
+		return numerator / denominator;
+	}
+}
+
+export class SwapCalculatorV2 implements ISwapCalculator {
 	private getPoolAmountOutV2(
 		pool: Pool,
 		amountIn: number,
@@ -83,7 +90,18 @@ export class SwapCalculator implements ISwapCalculator {
 
 		return totalOut;
 	}
+	getAmountOutV2(amountIn: number, reserveIn: number, reserveOut: number) {
+		const numerator = reserveOut * amountIn;
+		const denominator = reserveIn + amountIn;
+		return numerator / denominator;
+	}
+	calculateSwap(pool: Pool, amountIn: number, tokenIn: Token): number {
+		return this.getPoolAmountOutV2(pool, amountIn, tokenIn);
+		/* } */
+	}
+}
 
+/* export class SwapCalculatorV3 implements ISwapCalculator {
 	private getPoolAmountOutV3(
 		pool: Pool,
 		amountIn: number,
@@ -128,33 +146,16 @@ export class SwapCalculator implements ISwapCalculator {
 
 		return totalOut;
 	}
-
-	calculateSwap(
-		pool: Pool,
-		amountIn: number,
-		tokenIn: Token,
-		version: 1 | 2
-	): number {
-		/* 	if (pool.v3Options) {
-			return this.getPoolAmountOutV3(pool, amountIn, tokenIn);
-		} else if (pool.fee === 0.003) {
-			return this.getPoolAmountOut(pool, amountIn, tokenIn);
-		} else { */
-		if (version === 1) {
-			return this.getPoolAmountOut(pool, amountIn, tokenIn);
-		}
-		return this.getPoolAmountOutV2(pool, amountIn, tokenIn);
-		/* } */
-	}
 	getAmountOut(amountIn: number, reserveIn: number, reserveOut: number) {
 		const amountInWithFee = amountIn * 9970;
 		const numerator = amountInWithFee * reserveOut;
 		const denominator = reserveIn * 10000 + amountInWithFee;
 		return numerator / denominator;
 	}
-	getAmountOutV2(amountIn: number, reserveIn: number, reserveOut: number) {
-		const numerator = reserveOut * amountIn;
-		const denominator = reserveIn + amountIn;
-		return numerator / denominator;
+	calculateSwap(pool: Pool, amountIn: number, tokenIn: Token): number {
+		if(!pool.v3Options) {
+			throw new Error("This pool is not using Uniswap v3 options");
+		}
+		return this.getPoolAmountOutV3(pool, amountIn, tokenIn);
 	}
-}
+} */
